@@ -1,26 +1,31 @@
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from google.cloud import aiplatform
+import vertexai
+from vertexai.generative_models import GenerativeModel
 
 app = FastAPI()
 
-# Modelo de la petición
+# Inicializar Vertex AI
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
+LOCATION = "us-central1"
+
+vertexai.init(project=PROJECT_ID, location=LOCATION)
+
+# Modelo generativo
+model = GenerativeModel("gemini-1.5-flash")
+
 class PromptRequest(BaseModel):
     prompt: str
-
-# Inicializar Vertex AI
-aiplatform.init(location="us-central1")  # Ajusta si usas otra región
 
 @app.post("/generate")
 async def generate_text(request: PromptRequest):
     try:
-        # Cliente de Gemini
-        model = aiplatform.GenerativeModel("gemini-1.5-flash")
-
-        # Llamar al modelo
         response = model.generate_content(request.prompt)
-
         return {"response": response.text}
-
     except Exception as e:
-        return {"error": str(e)}
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/")
+def read_root():
+    return {"message": "Vertex AI Cloud Run service is up!"}
