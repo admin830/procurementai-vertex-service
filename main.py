@@ -4,17 +4,23 @@ from google.cloud import aiplatform
 
 app = FastAPI()
 
+# Modelo de la petición
 class PromptRequest(BaseModel):
     prompt: str
 
-@app.post("/ask")
-def ask_vertex(req: PromptRequest):
-    # Inicializa Vertex
-    aiplatform.init(project="PROJECT_ID", location="us-central1")
-    
-    # Modelo generativo (Gemini)
-    model = aiplatform.GenerativeModel("gemini-1.5-flash")
+# Inicializar Vertex AI
+aiplatform.init(location="us-central1")  # Ajusta si usas otra región
 
-    response = model.generate_content(req.prompt)
+@app.post("/generate")
+async def generate_text(request: PromptRequest):
+    try:
+        # Cliente de Gemini
+        model = aiplatform.GenerativeModel("gemini-1.5-flash")
 
-    return {"response": response.text}
+        # Llamar al modelo
+        response = model.generate_content(request.prompt)
+
+        return {"response": response.text}
+
+    except Exception as e:
+        return {"error": str(e)}
