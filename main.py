@@ -13,7 +13,7 @@ LOCATION = "us-central1"
 vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 # Modelo generativo
-model = GenerativeModel("publishers/google/models/gemini-1.5-flash-001")
+model = GenerativeModel("gemini-2.5-pro")
 
 
 class PromptRequest(BaseModel):
