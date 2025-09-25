@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 # Modelo por defecto (puedes cambiar)
-DEFAULT_MODEL = "publishers/google/models/gemini-2.5-pro"
+DEFAULT_MODEL = "gemini-2.5-pro"
 
 class PromptPayload:
     # simple parsing without pydantic for brevity
