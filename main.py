@@ -4,21 +4,25 @@ from fastapi.middleware.cors import CORSMiddleware
 import vertexai
 from vertexai.generative_models import GenerativeModel
 
-# --- Config ---
+# --- Configuración ---
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "procurementai-473016")
 LOCATION = os.getenv("LOCATION", "us-central1")
 
-# Origenes permitidos: RECOMENDADO poner la URL exacta de tu bucket
-# Ejemplo: "https://storage.googleapis.com/procurementai-web"
-# Para prueba rápida puedes usar "*" (ver nota).
-ALLOWED_ORIGINS = os.getenv("https://storage.googleapis.com/procurementai-web/index.html", "https://storage.googleapis.com/procurementai-web")  
+# 🚨 IMPORTANTE: pon aquí la URL exacta de tu frontend en Storage
+# Ejemplo de bucket público:
+#   https://storage.googleapis.com/procurementai-web/index.html
+#   https://storage.googleapis.com/procurementai-web
+ALLOWED_ORIGINS = os.getenv(
+    "ALLOWED_ORIGINS",
+    "https://storage.googleapis.com/procurementai-web"
+)
 
-# --- Init Vertex ---
+# --- Inicializa Vertex ---
 vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 app = FastAPI()
 
-# CORS: si ALLOWED_ORIGINS == "*" entonces setear allow_credentials=False
+# --- Configura CORS ---
 if ALLOWED_ORIGINS.strip() == "*":
     allow_credentials = False
     origins = ["*"]
@@ -34,16 +38,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Modelo por defecto (puedes cambiar)
+# Modelo por defecto
 DEFAULT_MODEL = "gemini-2.5-pro"
 
-class PromptPayload:
-    # simple parsing without pydantic for brevity
-    pass
 
 @app.get("/")
 def health():
     return {"status": "ok"}
+
 
 @app.post("/generate")
 async def generate(request: Request):
@@ -55,7 +57,10 @@ async def generate(request: Request):
         model = GenerativeModel(model_name)
         response = model.generate_content(prompt)
 
-        return {"model_used": model_name, "response": response.text}
+        return {
+            "model_used": model_name,
+            "response": response.text
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
