@@ -1,28 +1,28 @@
 import os
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import vertexai
 from vertexai.generative_models import GenerativeModel
 
-# --- Configuración ---
+# --- Config ---
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "procurementai-473016")
 LOCATION = os.getenv("LOCATION", "us-central1")
 
-# 🚨 IMPORTANTE: pon aquí la URL exacta de tu frontend en Storage
-# Ejemplo de bucket público:
-#   https://storage.googleapis.com/procurementai-web/index.html
-#   https://storage.googleapis.com/procurementai-web
+# Orígenes permitidos: mejor poner la URL exacta de tu bucket
+# Ejemplo: "https://storage.googleapis.com/procurementai-web"
+# Para pruebas rápidas: "*"
 ALLOWED_ORIGINS = os.getenv(
     "ALLOWED_ORIGINS",
     "https://storage.googleapis.com/procurementai-web"
 )
 
-# --- Inicializa Vertex ---
+# --- Init Vertex ---
 vertexai.init(project=PROJECT_ID, location=LOCATION)
 
 app = FastAPI()
 
-# --- Configura CORS ---
+# Configuración de CORS
 if ALLOWED_ORIGINS.strip() == "*":
     allow_credentials = False
     origins = ["*"]
@@ -41,12 +41,12 @@ app.add_middleware(
 # Modelo por defecto
 DEFAULT_MODEL = "gemini-2.5-pro"
 
-
+# Health check
 @app.get("/")
 def health():
     return {"status": "ok"}
 
-
+# Endpoint principal
 @app.post("/generate")
 async def generate(request: Request):
     try:
@@ -57,10 +57,17 @@ async def generate(request: Request):
         model = GenerativeModel(model_name)
         response = model.generate_content(prompt)
 
-        return {
-            "model_used": model_name,
-            "response": response.text
-        }
+        return {"model_used": model_name, "response": response.text}
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Manejo global de errores con CORS ---
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={"Access-Control-Allow-Origin": origins[0] if origins else "*"}
+    )
