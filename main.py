@@ -11,7 +11,7 @@ LOCATION = os.getenv("LOCATION", "us-central1")
 # Origenes permitidos: RECOMENDADO poner la URL exacta de tu bucket
 # Ejemplo: "https://storage.googleapis.com/procurementai-web"
 # Para prueba rápida puedes usar "*" (ver nota).
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://storage.googleapis.com/procurementai-web")  
+ALLOWED_ORIGINS = os.getenv("https://storage.googleapis.com/procurementai-web/index.html", "https://storage.googleapis.com/procurementai-web")  
 
 # --- Init Vertex ---
 vertexai.init(project=PROJECT_ID, location=LOCATION)
@@ -35,7 +35,7 @@ app.add_middleware(
 )
 
 # Modelo por defecto (puedes cambiar)
-DEFAULT_MODEL = "publishers/google/models/gemini-1.5-pro-001"
+DEFAULT_MODEL = "publishers/google/models/gemini-2.5-pro"
 
 class PromptPayload:
     # simple parsing without pydantic for brevity
