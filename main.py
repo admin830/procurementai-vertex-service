@@ -6,13 +6,14 @@ from vertexai.generative_models import GenerativeModel
 from google.cloud import storage
 import pandas as pd
 import pdfplumber
+import io
 
 # --- Config ---
 PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT", "procurementai-473016")
 LOCATION = os.getenv("LOCATION", "us-central1")
-BUCKET_NAME = os.getenv("BUCKET_NAME", "procurementai-datos")  # tu bucket con PDFs/CSVs
+BUCKET_NAME = os.getenv("BUCKET_NAME", "procurementai-data")  # bucket de los documentos
 
-# Origen permitido
+# Origen permitido (tu web estática)
 ALLOWED_ORIGINS = [
     "https://storage.googleapis.com",
     "https://storage.googleapis.com/procurementai-web"
@@ -20,7 +21,7 @@ ALLOWED_ORIGINS = [
 
 # --- Init Vertex ---
 vertexai.init(project=PROJECT_ID, location=LOCATION)
-model = GenerativeModel("gemini-2.5-pro")  # modelo por defecto
+model = GenerativeModel("gemini-2.5-pro")
 
 # --- Init FastAPI ---
 app = FastAPI()
@@ -36,29 +37,28 @@ app.add_middleware(
 # Cliente GCS
 storage_client = storage.Client()
 
-# --- Función para leer archivos ---
-def leer_archivo_gcs(nombre_objeto: str) -> str:
-    """Detecta tipo de archivo y devuelve contenido de texto"""
-    bucket = storage_client.bucket(BUCKET_NAME)
-    blob = bucket.blob(nombre_objeto)
+# --- Función para leer UN archivo ---
+def leer_archivo_gcs(blob) -> str:
+    """Detecta tipo de archivo y devuelve contenido en texto"""
+    nombre = blob.name
 
-    if nombre_objeto.endswith(".csv"):
+    if nombre.endswith(".csv"):
         contenido = blob.download_as_text()
-        df = pd.read_csv(pd.compat.StringIO(contenido))
-        return df.head(20).to_string(index=False)  # solo primeras 20 filas
+        df = pd.read_csv(io.StringIO(contenido))
+        return df.head(20).to_string(index=False)  # solo primeras filas
 
-    elif nombre_objeto.endswith(".pdf"):
+    elif nombre.endswith(".pdf"):
         contenido_texto = ""
-        with pdfplumber.open(blob.download_as_bytes()) as pdf:
+        with pdfplumber.open(io.BytesIO(blob.download_as_bytes())) as pdf:
             for page in pdf.pages:
-                contenido_texto += page.extract_text() + "\n"
-        return contenido_texto[:5000]  # limitamos tamaño
+                contenido_texto += page.extract_text() or ""
+        return contenido_texto[:5000]
 
-    elif nombre_objeto.endswith(".txt"):
+    elif nombre.endswith(".txt"):
         return blob.download_as_text(errors="ignore")[:5000]
 
     else:
-        raise ValueError("Tipo de archivo no soportado. Solo PDF, CSV, TXT.")
+        return ""  # ignoramos tipos no soportados
 
 # --- Endpoints ---
 @app.get("/")
@@ -71,17 +71,19 @@ async def generate(request: Request):
         body = await request.json()
         prompt = body.get("prompt", "")
         model_name = body.get("model") or "gemini-2.5-pro"
-        archivos = body.get("files", [])  # lista de archivos en el bucket
+
+        # --- Barrer todo el bucket ---
+        bucket = storage_client.bucket(BUCKET_NAME)
+        blobs = bucket.list_blobs()
 
         contexto = ""
-        for archivo in archivos:
-            # quitar prefijo gs://bucket/ si lo incluyes
-            nombre_objeto = archivo.split("/", 3)[-1]
-            texto = leer_archivo_gcs(nombre_objeto)
-            contexto += f"\n--- Contenido de {nombre_objeto} ---\n{texto}\n"
+        for blob in blobs:
+            texto = leer_archivo_gcs(blob)
+            if texto:
+                contexto += f"\n--- Contenido de {blob.name} ---\n{texto}\n"
 
         input_text = f"""
-        Contexto de los documentos:
+        Contexto de los documentos (PDF/CSV/TXT) en el bucket {BUCKET_NAME}:
         {contexto}
 
         Pregunta del usuario:
